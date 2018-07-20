@@ -1,0 +1,105 @@
+apply plugin: 'groovy'
+
+
+repositories {
+    jcenter()
+    maven {
+         url  "https://dl.bintray.com/cvarjao/maven"
+    }
+}
+
+dependencies {
+    compile 'org.codehaus.groovy:groovy-all:2.5.0'
+    compile 'ca.bc.gov.devops.cd.pipeline:ocp-pipeline:0.0.3'
+}
+
+sourceSets {
+    main {
+        groovy {
+            srcDirs = ['src/groovy']
+        }
+    }
+}
+
+ext.getScriptArgs = {->
+    def keys = project.getProperties().findAll { it.key.startsWith('args.') }.collect { it.key }
+    def argsMap = project.getProperties().subMap(keys)
+    def args =[]
+    for (def entry:argsMap){
+        if (entry.key.startsWith('args.')){
+            String argKey=entry.key.substring(5)
+            args+=["${argKey}=${entry.value}"]
+        }
+    }
+    return args
+}
+
+task('cd-build', type: JavaExec) {
+    description 'Run Groovy script'
+ 
+    // Set main property to name of Groovy script class.
+    main = 'Build'
+ 
+    // Set classpath for running the Groovy script.
+    classpath = sourceSets.main.runtimeClasspath
+ 
+    args project.getScriptArgs()
+
+    workingDir file(['git', 'rev-parse', '--show-toplevel'].execute().text.trim())
+}
+
+task('cd-deploy', type: JavaExec) {
+    description 'Run Groovy script'
+ 
+    // Set main property to name of Groovy script class.
+    main = 'Deploy'
+ 
+    // Set classpath for running the Groovy script.
+    classpath = sourceSets.main.runtimeClasspath
+ 
+    args project.getScriptArgs()
+
+    workingDir file(['git', 'rev-parse', '--show-toplevel'].execute().text.trim())
+}
+
+task('cd-zap', type: JavaExec) {
+    description 'Run ZAP Groovy script'
+ 
+    // Set main property to name of Groovy script class.
+    main = 'Zap'
+ 
+    // Set classpath for running the Groovy script.
+    classpath = sourceSets.main.runtimeClasspath
+ 
+    args project.getScriptArgs()
+
+    workingDir file(['git', 'rev-parse', '--show-toplevel'].execute().text.trim())
+}
+
+task 'cd-zap-2' { Task task ->
+    doLast {
+        String namespace = 'empr-mds-dev'
+        String appLabel = 'mds-dev-pr-1'
+
+        def routesStdout = new ByteArrayOutputStream()
+
+        exec {
+            description = 'Run Zap'
+            workingDir file(['git', 'rev-parse', '--show-toplevel'].execute().text.trim())
+            commandLine 'oc', 'get', 'routes','-l', "app=${appLabel}", '--output=json', "--namespace=${namespace}"
+            standardOutput = routesStdout
+        }
+        def routes = new groovy.json.JsonSlurper().parseText(routesStdout.toString())
+        routes.items.each {Map route ->
+            String routeProtocol = ((route.spec?.tls!=null)?'https':'http')
+            String routeUrl = "${routeProtocol}://${route.spec.host}${route.spec.path?:'/'}"
+            exec {
+                description = 'Run Zap'
+                workingDir file(['git', 'rev-parse', '--show-toplevel'].execute().text.trim())
+                commandLine 'bash', '-c', "oc process -f openshift/zap.pod.json -l 'zap=${route.metadata.name}' -p 'APP=${appLabel}' -p 'NAME=zap-${route.metadata.name}' -p 'URL=${routeUrl}' --namespace=${namespace} |  oc replace -f - --namespace=${namespace} --force=true"
+            }
+        }
+    }
+}
+
+//tasks.getByName('show-args').shouldRunAfter tasks.getByName('oc-build')
