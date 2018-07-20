@@ -119,13 +119,13 @@
       "displayName": "Git Repository URL",
       "description": "The URL of the repository with your application source code.",
       "required": true,
-      "value": "https://github.com/cvarjao/mds.git"
+      "value": "https://github.com/garywong-bc/mds.git"
     },
     {
       "name": "SOURCE_REPOSITORY_REF",
       "displayName": "Git Reference",
       "description": "Set this to a branch name, tag or other ref of your repository if you are not using the default branch.",
-      "value": "master"
+      "value": "minishift-pipeline"
     },
     {
       "name": "SOURCE_CONTEXT_DIR",
