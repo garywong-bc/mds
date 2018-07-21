@@ -83,6 +83,12 @@
                 }                
             },
             {
+                "type": "Generic",
+                "generic": {
+                    "secret": "AcdfHAyzbUuM"
+                }                
+            },
+            {
                   "type": "ConfigChange"
               },
               {
